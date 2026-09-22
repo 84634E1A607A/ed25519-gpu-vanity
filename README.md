@@ -6,6 +6,19 @@ I copied this from here: https://github.com/mcf-rocks/solanity
 Then I made the following changes:
 1. Implemented public keys verification for 4 bytes to be 0
 2. Removed unnecessary base58 verification
+3. Replaced the insecure key generation (curand + sequential +1 counter) with a
+   ChaCha20 CSPRNG in counter mode, keyed per-GPU from the OS CSPRNG
+   (`getrandom(2)`, `/dev/urandom` fallback). Candidate seeds are now
+   unpredictable, non-repeating, and safe to use; the master key is never
+   logged. A built-in self test (ChaCha20 reference vectors, RFC 8032 ed25519
+   vectors, suffix-constraint cross-check) runs at startup.
+4. Suffix matching on the public key: the target is the tail of the key rather
+   than leading zero bytes (see `src/config.h`). Used to find an OpenSSH
+   ed25519 public key whose base64 ends with a chosen string.
+5. Launch the kernel with `minGridSize` instead of `maxActiveBlocks` so the
+   whole GPU is actually used (the old code ran 1 block on 1 of N SMs).
+6. `tools/seed_to_ssh.py` converts a MATCH seed into an OpenSSH keypair and
+   verifies it with ssh-keygen.
 
 When it finds a match, it will log a line starting with MATCH, you will see the vanity address found and the secret (seed) in hex.
 
